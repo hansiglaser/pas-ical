@@ -97,7 +97,16 @@ Type
 Const
   ReaderVerbosity : Integer = 0;
 
+Function CompareDTStart(Const E1,E2:TICalEvent) : Integer;
+
 Implementation
+
+Function CompareDTStart(Const E1,E2:TICalEvent):Integer;
+Begin
+  if      E1.FDTStart < E2.FDTStart then Result := -1
+  else if E1.FDTStart > E2.FDTStart then Result :=  1
+  else Result := 0;
+End;
 
 { TICalReader }
 
@@ -223,7 +232,7 @@ Begin
     Begin
       TICalReader.Split(KeyParts[I],K,V,'=');
       Case K of
-        'TZID'  : ;  // ignore
+        'TZID'  : ;  // ignored, TODO
         'VALUE' : Case V of
                     'DATE' : ValuePart := tvDate;
                   else
