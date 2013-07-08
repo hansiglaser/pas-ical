@@ -26,8 +26,11 @@ Type
     Function Get : String;
     Procedure Push;
     Procedure Expect(St:String);
-    class Procedure Split(Entry:String;Out Key,Value:String);
+    class Procedure Split(Entry:String;Out Key,Value:String;Delimiter:Char=':');
     class Function Split(Entry:String):TStringArray;
+    class Function DateTime(Value:String):TDateTime;
+    Class Function Date(Value:String):TDateTime;
+    class Function DateTime(KeyParts:TStringArray;Value:String):TDateTime;
   End;
 
   TStringStringMap = specialize TFPGMap<String,String>;
@@ -153,10 +156,10 @@ Begin
     raise Exception.Create('Expected '''+St+''' but got '''+FEntry+'''');
 End;
 
-Class Procedure TICalReader.Split(Entry:String;Out Key,Value:String);
+Class Procedure TICalReader.Split(Entry:String;Out Key,Value:String;Delimiter:Char=':');
 Var I : Integer;
 Begin
-  I := Pos(':',Entry);
+  I := Pos(Delimiter,Entry);
   if I = 0 then
     Begin
       Key := Entry;
@@ -183,6 +186,59 @@ Begin
     Result[Length(Result)-1] := Copy(Entry,P1,P2-P1);
     P1 := P2+1;
   Until false;
+End;
+
+Class Function TICalReader.Date(Value:String):TDateTime;
+Begin
+  Result := ComposeDateTime(
+    EncodeDate(
+      StrToInt(Copy(Value,1,4)),
+      StrToInt(Copy(Value,5,2)),
+      StrToInt(Copy(Value,7,2))),
+    0);
+End;
+
+Class Function TICalReader.DateTime(Value:String):TDateTime;
+Begin
+  Result := ComposeDateTime(
+    EncodeDate(
+      StrToInt(Copy(Value,1,4)),
+      StrToInt(Copy(Value,5,2)),
+      StrToInt(Copy(Value,7,2))),
+    EncodeTime(
+      StrToInt(Copy(Value,10,2)),
+      StrToInt(Copy(Value,12,2)),
+      StrToInt(Copy(Value,14,2)),
+      0));
+End;
+
+Class Function TICalReader.DateTime(KeyParts:TStringArray;Value:String):TDateTime;
+Type TValue = (tvDateTime,tvDate,tvTime);
+Var I : Integer;
+    K,V : String;
+    ValuePart : TValue;
+Begin
+  ValuePart := tvDateTime;
+  For I := 1 to Length(KeyParts)-1 do
+    Begin
+      TICalReader.Split(KeyParts[I],K,V,'=');
+      Case K of
+        'TZID'  : ;  // ignore
+        'VALUE' : Case V of
+                    'DATE' : ValuePart := tvDate;
+                  else
+                    raise Exception.Create('Unknown VALUE for date/time entry '''+V+'''');
+                  End
+      else
+        raise Exception.Create('Unknown key part key '''+K+''' for entry '''+KeyParts[0]+':'+Value+'''');
+      End;
+    End;
+  Case ValuePart of
+    tvDateTime : Result := TICalReader.DateTime(Value);
+    tvDate     : Result := TICalReader.Date(Value);
+  else
+    raise Exception.Create('Unimplemented ValuePart');
+  End;
 End;
 
 { TICalBlock }
@@ -265,13 +321,13 @@ Begin
   KeyParts := TICalReader.Split(Key);
   Case KeyParts[0] of
     'UID'           : FUID          := Value;
-    'DTSTAMP'       : FDTStamp      := 0;
+    'DTSTAMP'       : FDTStamp      := TICalReader.DateTime(KeyParts,Value);
     'TRANSP'        : FTransp       := Value;
-    'DTSTART'       : FDTStart      := 0;
-    'DTEND'         : FDTEnd        := 0;
+    'DTSTART'       : FDTStart      := TICalReader.DateTime(KeyParts,Value);
+    'DTEND'         : FDTEnd        := TICalReader.DateTime(KeyParts,Value);
     'SUMMARY'       : FSummary      := Value;
-    'CREATED'       : FCreated      := 0;
-    'LAST-MODIFIED' : FLastModified := 0;
+    'CREATED'       : FCreated      := TICalReader.DateTime(KeyParts,Value);
+    'LAST-MODIFIED' : FLastModified := TICalReader.DateTime(KeyParts,Value);
   else
     Result := false;  // couldn't handle the entry
   End;
