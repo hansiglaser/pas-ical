@@ -166,6 +166,31 @@ Begin
 End;
 
 Class Procedure TICalReader.Split(Entry:String;Out Key,Value:String;Delimiter:Char=':');
+  Function ParseSpecial(St:String):String;
+  Var I : Integer;
+  Begin
+    I := 1;
+    While I <= Length(St) do
+      Begin
+        if (St[I] = '\') and (I < Length(St)) then
+          Begin
+            Inc(I);
+            Case St[I] of
+              ',',
+              '"',
+              '\',
+              ';' : Delete(St,I-1,1);
+              'n' : Begin Delete(St,I-1,1); St[I-1] := ^J; End;
+            else
+              raise Exception.Create('Unknown special character ''\'+St[I]+'''');
+            End;
+          End
+        else
+          Inc(I);
+      End;
+    Result := St;
+  End;
+
 Var I : Integer;
 Begin
   I := Pos(Delimiter,Entry);
@@ -176,7 +201,7 @@ Begin
       Exit;
     End;
   Key   := Copy(Entry,1,I-1);
-  Value := Copy(Entry,I+1,Length(Entry));
+  Value := ParseSpecial(Copy(Entry,I+1,Length(Entry)));
 End;
 
 Class Function TICalReader.Split(Entry:String):TStringArray;

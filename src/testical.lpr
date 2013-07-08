@@ -1,7 +1,6 @@
 (*
 
 TODO:
- - handle '\,' in iCal entries
  - create new program to create a CSV file with all events (sorted), start- and
    end time, duration, and corrected for overlaps
 *)
