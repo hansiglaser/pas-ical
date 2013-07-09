@@ -1,21 +1,19 @@
 (**
  * Convert iCal file to CSV file
  *
- *
- * TODO:
- *  - corrected for overlaps
  *)
 Program ICal2CSV;
 
 {$mode objfpc}{$H+}
 
 Uses
-  Classes, SysUtils, ICal;
+  Classes, SysUtils, Math, ICal;
 
 Procedure Usage;
 Begin
-  WriteLn('Usage: ical2csv [-s] infile.ics');
+  WriteLn('Usage: ical2csv [-s] [-o] infile.ics');
   WriteLn('  -s   sort events by starts time');
+  WriteLn('  -o   merge overlapping events (implies -s)');
   WriteLn('The CSV file is printed to stdout');
   Halt;
 End;
@@ -23,9 +21,12 @@ End;
 Var
   Filename : String;
   Sort     : Boolean;
-  Cal : TICalCalendar;
-  I   : Integer;
-  St  : String;
+  Overlaps : Boolean;
+  I,J      : Integer;
+  Cal      : TICalCalendar;
+  Event    : TICalEvent;
+  NewEvent : Boolean;
+  St       : String;
 
 Begin
   // file name is last parameter
@@ -33,11 +34,13 @@ Begin
     Usage;
   Filename := ParamStr(ParamCount);
   // check all other parameters
-  Sort := false;
+  Sort     := false;
+  Overlaps := false;
   For I := 1 to ParamCount-1 do
     Begin
       Case ParamStr(I) of
         '-s'             : Sort := true;
+        '-o'             : Begin Sort := true; Overlaps := true; End;
         '-h', '--help'   : Usage;
       End
     End;
@@ -58,14 +61,55 @@ Begin
     Cal.FEvents.Sort(@CompareDTStart);
 
   // print as CSV
-  For I := 0 to Cal.FEvents.Count-1 do
+  I := 0;
+  While I < Cal.FEvents.Count do
     Begin
-      St := FormatDateTime('yyyy-mm-dd hh:nn:ss',Cal.FEvents[I].FDTStart) + ',' +
-            FormatDateTime('yyyy-mm-dd hh:nn:ss',Cal.FEvents[I].FDTEnd)   + ',' +
-            FormatDateTime('hh:nn:ss',Cal.FEvents[I].FDTEnd - Cal.FEvents[I].FDTStart) + ',' +
-            '"' + Cal.FEvents[I].FSummary + '"';
+      Event := Cal.FEvents[I];
+      NewEvent := false;
+
+      // find overlaps
+      if Overlaps then
+        Begin
+          J := 1;
+          while (I+J < Cal.FEvents.Count) and (Cal.FEvents[I+J].FDTStart < Event.FDTEnd) do
+            Begin
+              if J = 1 then
+                Begin
+                  // create new dummy event which summarizes all overlapping events
+                  Event := TICalEvent.Create;
+                  NewEvent := true;
+                  With Cal.FEvents[I] do
+                    Begin
+                      // copy old
+                      Event.FDTStart := FDTStart;
+                      Event.FDTEnd   := FDTEnd;
+                      Event.FSummary := '*Overlap* ' + FSummary;
+                    End;
+                End;
+              With Cal.FEvents[I+J] do
+                Begin
+                  // extedn dummy event with end time and summary
+                  Event.FDTEnd   := Max(Event.FDTEnd,FDTEnd);
+                  Event.FSummary := Event.FSummary + '; ' + FSummary;
+                End;
+              Inc(J);
+            End;
+          I := I + J - 1;
+        End;
+
+      // print
+      With Event do
+        St := FormatDateTime('yyyy-mm-dd hh:nn:ss',FDTStart) + ',' +
+              FormatDateTime('yyyy-mm-dd hh:nn:ss',FDTEnd)   + ',' +
+              FormatDateTime('hh:nn:ss',FDTEnd - FDTStart) + ',' +
+              '"' + FSummary + '"';
 
       WriteLn(St);
+
+      if NewEvent then
+        Event.Free;
+
+      Inc(I);
     End;
 
   Cal.Free;
