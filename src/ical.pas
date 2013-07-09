@@ -121,7 +121,8 @@ End;
 
 Destructor TICalReader.Destroy;
 Begin
-  Close(FText);
+  if TTextRec(FText).Mode = fmInput then
+    Close(FText);   // don't close if we got an exception in the constructor
   Inherited Destroy;
 End;
 
