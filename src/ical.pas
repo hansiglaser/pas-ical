@@ -66,7 +66,7 @@ Type
   TICalEvent = class(TICalBlock)
     FUID          : String;
     FDTStamp      : TDateTime;
-    FTransp       : String; // TODO: TICalTransp;
+    FTransp       : String; // TODO: TICalTransp; http://www.kanzaki.com/docs/ical/transp.html
     FDTStart      : TDateTime;
     FDTEnd        : TDateTime;
     FSummary      : String;
