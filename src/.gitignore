@@ -1,0 +1,8 @@
+testical
+ical2csv
+*.lps
+*.ics
+*.csv
+lib
+backup
+*~
